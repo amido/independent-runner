@@ -35,7 +35,7 @@ function Connect-Azure() {
         $secret = $env:ARM_CLIENT_SECRET,
 
         [string]
-        # Subscription ID 
+        # Subscription ID
         $subscriptionId = $env:ARM_SUBSCRIPTION_ID,
 
         [string]

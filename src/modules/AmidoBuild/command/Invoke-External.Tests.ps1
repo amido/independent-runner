@@ -6,7 +6,11 @@ Describe "Invoke-External" {
         # Import function under test
         . $PSScriptRoot/Invoke-External.ps1
 
+        # Import dependent functions
         . $PSScriptRoot/Stop-Task.ps1
+
+        # Import dependent classes
+        . $PSScriptRoot/../classes/StopTaskException.ps1
 
         # Create the testFolder
         $testFolder = (New-Item 'TestDrive:\folder' -ItemType Directory).FullName
@@ -35,7 +39,6 @@ Describe "Invoke-External" {
         }
 
         AfterAll {
-
             Remove-Variable -Name Session -Scope global
         }
 
@@ -65,7 +68,7 @@ Describe "Invoke-External" {
 
             # build up array of commands to run
             $cmds = @(
-                "docker build",
+                "docker build"
                 "dotnet build",
                 "terraform plan"
             )

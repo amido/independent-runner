@@ -1,4 +1,4 @@
-
+# TODO: Are these tests actually testing Confirm-Environment, it appears to be more of a Get-EnvConfig test file..?
 Describe "Confirm-Environment" {
 
     BeforeAll {
@@ -11,72 +11,109 @@ Describe "Confirm-Environment" {
         . $PSScriptRoot/../utils/Confirm-Parameters.ps1
         . $PSScriptRoot/../utils/Get-EnvConfig.ps1
 
-        # Create the testFolder
-        $testFolder = (New-Item 'TestDrive:\folder' -ItemType Directory).FullName
-
-        # Create file to be used for testing
-        $stageVarFile = [IO.Path]::Combine($testFolder, "stagevars.yml")
-        Set-Content -Path $stageVarFile -Value @"
-default:
-    variables:
-    credentials:
-        azure:
-            - name: ARM_CLIENT_ID
-
-stages:
-    - name: pester
-      variables:
-        - name: PESTER_TEST_VAR
-        - name: TF_region
-          cloud: [aws]
-"@
+        # Import dependent classes
+        . $PSScriptRoot/../classes/StopTaskException.ps1
 
         # Mocks
-        # Write-Error - mock to the function that writes out errors
-        Mock -Command Write-Host -MockWith {}
-        Mock -Command Write-Warning -MockWith {}
-
+        Mock -Command Write-Error -MockWith { }
+        Mock -Command Write-Warning -MockWith { }
     }
 
     Context "Check parameters" {
-
         It "will error if no path is provided" {
+            Mock `
+                -Command Stop-Task `
+                -Verifiable `
+                -MockWith {
+                    throw [StopTaskException]::new(1, "TestExceptionThrown")
+                } `
+                -ParameterFilter { $Message -eq "Specified file does not exist: " }
 
-            { Confirm-Environment } | Should -Throw "Task failed due to errors detailed above"
+            $ShouldParams = @{
+                Throw = $true
+                ExceptionType = [StopTaskException]
+                ExpectedMessage = "TestExceptionThrown"
+                # Command to run
+                ActualValue = { Confirm-Environment }
+            }
 
-            Should -Invoke -CommandName Write-Host -Times 1
+            Should @ShouldParams
+            Should -InvokeVerifiable
         }
     }
 
     Context "Enviroment" {
 
         It "will error and terminate because PESTER_TEST_VAR is not set" {
+            Mock -Command Get-EnvConfig -MockWith {
+                @{
+                    name = "PESTER_TEST_VAR"
+                }
+            }
 
-            { Confirm-Environment -Path $stageVarFile -Stage "pester" } | Should -Throw "Task failed due to errors detailed above"
+            Mock `
+                -Command Stop-Task `
+                -Verifiable `
+                -MockWith {
+                    throw [StopTaskException]::new(1, "TestExceptionThrown")
+                } `
+                -ParameterFilter {
+                    $Message -eq "The following environment variables are missing and must be provided:" `
+                        + "`n`tPESTER_TEST_VAR" `
+                }
 
+            $ShouldParams = @{
+                Throw = $true
+                ExceptionType = [StopTaskException]
+                ExpectedMessage = "TestExceptionThrown"
+                # Command to run
+                ActualValue = { Confirm-Environment -Path $stageVarFile -Stage "pester" }
+            }
+
+            Should @ShouldParams
+
+            Should -InvokeVerifiable
         }
 
-        # Check that the function will warn if no stage has been specfied
-        # As there are no default variables in the above config file there will be
+        # Check that as there are no default variables the config file there will be
         # no error or exception
-        It "will warn if no stage has been specified" {
+        It "will not throw if no stage has been specified" {
+            Mock -Command Get-EnvConfig -MockWith { return @{} }
 
-            Confirm-Environment -Path $stageVarFile
+            {  Confirm-Environment -Path 'noop' } | Should -Not -Throw
 
-            Should -Invoke -CommandName Write-Warning -Times 1 
+            Should -Command Write-Error -Exactly 0
         }
 
-        it "will ignot cloud specific vars if no cloud has been specified" {
-            $results = Confirm-Environment -Path $stageVarFile -Passthru -stage pester
+        it "will ignore cloud specific vars if no cloud has been specified" {
+            Mock -Command Get-EnvConfig -MockWith {
+                @{
+                    name = "PESTER_TEST_VAR"
+                }
+            }
+
+            $results = Confirm-Environment -Path 'noop' -Passthru -stage pester
 
             $results.count | Should -Be 1
         }
 
-        # Ensure that when a cloud has been specified the corect number of missing variables is set properly
+        # Ensure that when a cloud has been specified the correct number of missing variables is set properly
         # This tests that cloud specified variables can be added to the configuration file and referenced properly
         it "will check cloud specific variables" {
+            Mock -Command Get-EnvConfig -MockWith {
+                return @(
+                    @{
+                        name = "PESTER_TEST_VAR"
+                    }
+                    @{
+                        name = "TF_region"
+                        cloud = @("aws")
+                    }
+                )
+            }
 
-            $results = Confirm-Environment -Path $stageVarFile -Cloud aws -Passthru -stage pester
+
+            $results = Confirm-Environment -Path 'noop' -Cloud aws -Passthru -stage pester
 
             $results.count | Should -Be 2
         }

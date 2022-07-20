@@ -3,10 +3,10 @@ Describe "Build-PowerShellModule" {
 
     BeforeAll {
 
-        # Include the function under test
+        # Import the function under test
         . $PSScriptRoot/Build-PowerShellModule.ps1
 
-        # Include dependent functions
+        # Import dependent functions
         . $PSScriptRoot/../utils/Confirm-Parameters.ps1
         . $PSScriptRoot/../utils/Convert-HashToString.ps1
         . $PSScriptRoot/../utils/Convert-ArrayToString.ps1
@@ -112,7 +112,7 @@ Describe "Build-PowerShellModule" {
     )
 }
 "@
-            
+
             # Create a function file to ensure that it gets into the PSM file
             Add-Content -Path ([IO.Path]::Combine($functionsDir, "Get-Test.ps1")) -Value @"
 function Get-Test() {
@@ -157,7 +157,7 @@ Describe "Get-Test" {
 
             # Check that the necessary files exist
             Test-Path -Path ([IO.Path]::Combine($outputDir.FullName, "MyModule", ("{0}.psd1" -f $name))) | Should -Be $true
-            Test-Path -Path ([IO.Path]::Combine($outputDir.FullName, "MyModule", ("{0}.psm1" -f $name))) | Should -Be $true            
+            Test-Path -Path ([IO.Path]::Combine($outputDir.FullName, "MyModule", ("{0}.psm1" -f $name))) | Should -Be $true
 
             # The PSM file contains the functions in the files
             Get-Content -Path ([IO.Path]::Combine($outputDir.FullName, "MyModule", ("{0}.psm1" -f $name))) -Raw | Should -BeLike '*$MyModuleSession = @{*commands*'
@@ -165,4 +165,3 @@ Describe "Get-Test" {
         }
     }
 }
-

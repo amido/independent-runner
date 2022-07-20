@@ -5,27 +5,27 @@ Describe "Invoke-GitClone" {
 
         # Import the function being tested
         . $PSScriptRoot/Invoke-GitClone.ps1
-    
+
         # Import depdencies
         . $PSScriptRoot/../utils/Confirm-IsWebAddress.ps1
-    
+
         # Create the testFolder
-        $testFolder = (New-Item 'TestDrive:\folder' -ItemType Directory).FullName    
-    
-        # Mock functions that are called    
+        $testFolder = (New-Item 'TestDrive:\folder' -ItemType Directory).FullName
+
+        # Mock functions that are called
         # - Write-Error - mock this internal function to check that errors are being raised
         Mock -Command Write-Error -MockWith { return $MessageData } -Verifiable
-    
+
         # - Invoke-WebRequest - do not want to actually perform a clone at this point
         Mock -Command Invoke-WebRequest -MockWith {}
-    
+
         # - Expand-Archive - check that the zip file is being unpacked
         Mock -Command Expand-Archive -MockWith {}
-    
-        # - Move-Item - this is used to move the unpacked directory to one that matches the 
+
+        # - Move-Item - this is used to move the unpacked directory to one that matches the
         #               repository name
         Mock -Command Move-Item -MockWith {}
-    
+
         # - Remove-Item
         Mock -Command Remove-Item -MockWith {}
     }
@@ -58,7 +58,7 @@ Describe "Invoke-GitClone" {
             $url = "https://github.com/amido/stacks-cli/archive/main.zip"
 
             $result = $(Invoke-GitClone -Type github -Repo $url -Verbose) 4>&1
-        
+
             $result[0] | Should -Be $url
 
             # Invoke-WebRequest should have been called
@@ -73,7 +73,7 @@ Describe "Invoke-GitClone" {
             # Create a dummy zip file in the testfolder to work with
             New-Item -ItemType File -Path (Join-Path -Path $testFolder -ChildPath "amido_stacks-cli_main.zip")
         }
-    
+
         It "will attempt to unpack the downloaded zip file" {
 
             $result = $(Invoke-GitClone -Type github -Repo "amido/stacks-cli" -Path $testFolder -Verbose) 4>&1

@@ -2,10 +2,10 @@ Describe "Connect-Azure" {
 
     BeforeAll {
 
-        # Import funciton under test
+        # Import function under test
         . $PSScriptRoot/Connect-Azure.ps1
 
-        # Import dependencies
+        # Import dependent functions
         . $PSScriptRoot/../utils/Confirm-Parameters.ps1
 
         # Mocks
@@ -13,6 +13,7 @@ Describe "Connect-Azure" {
         Mock -CommandName Write-Error -MockWith {}
 
         # - Connect-AzAccount
+        function Connect-AzAccount {}
         Mock -CommandName Connect-AzAccount -MockWith {}
     }
 

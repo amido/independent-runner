@@ -12,8 +12,11 @@ Describe "Invoke-Inspec" {
         . $PSScriptRoot/../command/Stop-Task.ps1
         . $PSScriptRoot/../utils/Confirm-Parameters.ps1
 
+        # Import dependent classes
+        . $PSScriptRoot/../classes/StopTaskException.ps1
+
         # Create the testFolder
-        $testFolder = (New-Item 'TestDrive:\folder' -ItemType Directory).FullName        
+        $testFolder = (New-Item 'TestDrive:\folder' -ItemType Directory).FullName
 
         $global:Session = @{
             commands = @{
@@ -21,30 +24,31 @@ Describe "Invoke-Inspec" {
             }
             dryrun = $true
         }
-        
-        # Mock commands to check that they are being called
-        # - Write-Host
-        Mock -CommandName Write-Host -MockWith { }
 
+        # Mock commands to check that they are being called
+        # - Write-Error
+        Mock -CommandName Write-Error -MockWith { }
+
+        Mock -CommandName inspec -MockWith { }
     }
 
     Context "Initialize" {
 
         BeforeEach {
             # Reset the commands list to an empty array
-            $global:Session.commands.list = @()            
+            $global:Session.commands.list = @()
         }
 
         It "will error if no path has been specified" {
-            { Invoke-Inspec -init } | Should -Throw "Task failed due to errors detailed above"
+            { Invoke-Inspec -init } | Should -Throw "Path to the Inspec test files must be specified`nTask failed due to errors detailed above"
 
-            Should -Invoke Write-Host
+            Should -Invoke Write-Error
         }
 
         It "will error if the path to the files does not exist" {
-            { Invoke-Inspec -init -path "pester" } | Should -Throw "Task failed due to errors detailed above"
+            { Invoke-Inspec -init -path "pester" } | Should -Throw "Specfied path for Inspec files does not exist: pester`nTask failed due to errors detailed above"
 
-            Should -Invoke Write-Host
+            Should -Invoke Write-Error
         }
 
         It "will initialise inspec" {
@@ -63,7 +67,7 @@ Describe "Invoke-Inspec" {
 
             Remove-Item env:\INSPEC_ARGS -ErrorAction SilentlyContinue
         }
-        
+
         It "will execute the tests for the specified cloud" {
             Invoke-Inspec -exec -path $testfolder -cloud azure
 
@@ -90,7 +94,7 @@ Describe "Invoke-Inspec" {
             # Set the environment variable
             $env:INSPEC_ARGS = "--input resource_group_name=myresources-euw"
 
-            Invoke-Inspec -exec -path $testfolder -cloud azure 
+            Invoke-Inspec -exec -path $testfolder -cloud azure
 
             # check that the generated command is correct
             $Session.commands.list[0] | Should -BeLike "*inspec* exec . -t azure:// --reporter cli --input resource_group_name=myresources-euw"
@@ -126,7 +130,7 @@ Describe "Invoke-Inspec" {
 
         BeforeEach {
             # Reset the commands list to an empty array
-            $global:Session.commands.list = @()            
+            $global:Session.commands.list = @()
         }
 
         it "will vendor the profile in the specified path" {

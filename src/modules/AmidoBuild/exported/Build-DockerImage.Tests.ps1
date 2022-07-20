@@ -1,5 +1,7 @@
 Describe "Build-DockerImage" {
 
+    $ModulePath
+
     BeforeAll {
 
         # Null any env vars which can be used to alter behaviour of the command
@@ -9,6 +11,10 @@ Describe "Build-DockerImage" {
         $env:DOCKER_CONTAINER_REGISTRY_NAME = $null
         $env:ECR_REGION = $null
         $env:REGISTRY_RESOURCE_GROUP = $null
+
+        # Make stubbed module available
+        $ModulePath = $env:PSModulePath
+        $env:PSModulePath = "$PSScriptRoot/../../../../test/stubs/modules$([IO.Path]::PathSeparator)$env:PSModulePath"
 
         # Import the function being tested
         . $PSScriptRoot/Build-DockerImage.ps1
@@ -45,13 +51,13 @@ Describe "Build-DockerImage" {
         # - Connect-Azure - as we are just testing the functionality of the Build-DockerImage function
         #                   connecting to Azure is not required and thus is mocked
         Mock -Command Connect-Azure -MockWith { return }
+    }
 
-        $LASTEXITCODE = 0
-
+    AfterAll {
+        $env:PSModulePath = $ModulePath
     }
 
     BeforeEach {
-
         # Create a session object so that the Invoke-External function does not
         # execute any commands but the command that would be run can be checked
         $global:Session = @{
@@ -65,26 +71,24 @@ Describe "Build-DockerImage" {
     Context "Check mandatory parameters" {
 
         BeforeAll {
-
-            # Mock Write-Error to check that it has been called
             Mock -CommandName Write-Error -MockWith {} -Verifiable
             Mock -CommandName Write-Information -MockWith {} -Verifiable
         }
 
         It "must error if no name is given for the image" {
-          try {
-            Build-DockerImage
-        }
-        catch {
-            $err = $true
-        }
-        write-host $err
-        $err | Should -Be $true
-        # This syntax is used because [ParameterBindingException] which is returned is not able to be captured by the Pester `Should -Throw` syntax
+            $ShouldParams = @{
+                Throw = $true
+                ExpectedMessage = "Parameter set cannot be resolved using the specified named parameters. One or more parameters issued cannot be used together or an insufficient number of parameters were provided."
+                ExceptionType = [System.Management.Automation.ParameterBindingException]
+                # Command to run
+                ActualValue = { Build-DockerImage }
+            }
+
+            Should @ShouldParams
         }
 
         It "will set a default tag if one is not set" {
-            Build-DockerImage  -Name unittests
+            Build-DockerImage -Name unittests
 
             Should -Invoke -CommandName Write-Information -Times 1
         }
@@ -93,13 +97,13 @@ Describe "Build-DockerImage" {
             Build-DockerImage  -Name unittests -Push
 
             Should -Invoke -CommandName Write-Error -Times 1
-          }
+        }
 
         It "must error if trying to push to a generic registry and do not specify DOCKER_USERNAME or DOCKER_PASSWORD env vars" {
-          Build-DockerImage  -Name unittests -Push -Provider "Generic"
+            Build-DockerImage  -Name unittests -Push -Provider "Generic"
 
-          Should -Invoke -CommandName Write-Error -Times 1
-          }
+            Should -Invoke -CommandName Write-Error -Times 1
+        }
     }
 
     Context "Build without push" {
@@ -170,9 +174,10 @@ Describe "Build-DockerImage" {
             $Session.commands.list[2] | Should -BeLike "*docker* push docker.io/pester-tests:unittests"
         }
         AfterEach {
-          $env:DOCKER_USERNAME = $null
-          $env:DOCKER_PASSWORD = $null
-      }
+            # TODO: This should capture and re-set after
+            $env:DOCKER_USERNAME = $null
+            $env:DOCKER_PASSWORD = $null
+        }
     }
 
     Context "Build image and push including latest to the specified generic registry" {
@@ -202,72 +207,58 @@ Describe "Build-DockerImage" {
             # Ensure that the image is pushed to the registry with latest tag
             $Session.commands.list[3] | Should -BeLike "*docker* push docker.io/pester-tests:latest"
         }
+
         AfterEach {
-          $env:DOCKER_USERNAME = $null
-          $env:DOCKER_PASSWORD = $null
-      }
+            $env:DOCKER_USERNAME = $null
+            $env:DOCKER_PASSWORD = $null
+        }
     }
 
     Context "Build image and push to azure registry" {
 
-      BeforeEach {
-          # Reset the commands list to an empty array
-          $global:Session.commands.list = @()
-      }
+        BeforeEach {
+            # Reset the commands list to an empty array
+            $global:Session.commands.list = @()
+        }
 
-      It "will build and push the image to the specified azure registry" {
+        It "will build and push the image to the specified azure registry" {
 
-          # Call the function under test
-          Build-DockerImage -provider "azure" -group "test" -name pester-tests -tag "unittests" -registry "docker.io" -push
+            # Call the function under test
+            Build-DockerImage -provider "azure" -group "test" -name pester-tests -tag "unittests" -registry "docker.io" -push
 
-          # Check the build command
-          $Session.commands.list[0] | Should -BeLike "*docker* build . -t pester-tests:unittests -t docker.io/pester-tests:unittests -t docker.io/pester-tests:latest"
+            # Check the build command
+            $Session.commands.list[0] | Should -BeLike "*docker* build . -t pester-tests:unittests -t docker.io/pester-tests:unittests -t docker.io/pester-tests:latest"
 
-          # Check that docker logs into the registry
-          $Session.commands.list[1] | Should -BeLike "*docker* login docker.io -u pester -p pester123"
+            # Check that docker logs into the registry
+            $Session.commands.list[1] | Should -BeLike "*docker* login docker.io -u pester -p pester123"
 
-          # Ensure that the image is pused to the registry
-          $Session.commands.list[2] | Should -BeLike "*docker* push docker.io/pester-tests:unittests"
-      }
-  }
+            # Ensure that the image is pused to the registry
+            $Session.commands.list[2] | Should -BeLike "*docker* push docker.io/pester-tests:unittests"
+        }
+    }
 
-  Context "Build image and push including latest to the specified azure registry" {
+    Context "Build image and push including latest to the specified azure registry" {
+        BeforeEach {
+            # Reset the commands list to an empty array
+            $global:Session.commands.list = @()
+        }
 
-      BeforeEach {
-          # Reset the commands list to an empty array
-          $global:Session.commands.list = @()
-      }
+        It "will build and push the image to the specified azure registry with a latest tag" {
 
-      It "will build and push the image to the specified azure registry with a latest tag" {
+            # Call the function under test
+            Build-DockerImage -provider "azure"  -group "test"  -name pester-tests -tag "unittests" -registry "docker.io" -push -latest
 
-          # Call the function under test
-          Build-DockerImage -provider "azure"  -group "test"  -name pester-tests -tag "unittests" -registry "docker.io" -push -latest
+            # Check the build command
+            $Session.commands.list[0] | Should -BeLike "*docker* build . -t pester-tests:unittests -t docker.io/pester-tests:unittests -t docker.io/pester-tests:latest"
 
-          # Check the build command
-          $Session.commands.list[0] | Should -BeLike "*docker* build . -t pester-tests:unittests -t docker.io/pester-tests:unittests -t docker.io/pester-tests:latest"
+            # Check that docker logs into the registry
+            $Session.commands.list[1] | Should -BeLike "*docker* login docker.io -u pester -p pester123"
 
-          # Check that docker logs into the registry
-          $Session.commands.list[1] | Should -BeLike "*docker* login docker.io -u pester -p pester123"
+            # Ensure that the image is pushed to the registry with specific tag
+            $Session.commands.list[2] | Should -BeLike "*docker* push docker.io/pester-tests:unittests"
 
-          # Ensure that the image is pushed to the registry with specific tag
-          $Session.commands.list[2] | Should -BeLike "*docker* push docker.io/pester-tests:unittests"
-
-          # Ensure that the image is pushed to the registry with latest tag
-          $Session.commands.list[3] | Should -BeLike "*docker* push docker.io/pester-tests:latest"
-      }
-  }
-
+            # Ensure that the image is pushed to the registry with latest tag
+            $Session.commands.list[3] | Should -BeLike "*docker* push docker.io/pester-tests:latest"
+        }
+    }
 }
-
-
-
-# DEBUG NOTES
-
-# it "will error" {
-#   Invoke-Login -AWS
-
-#   Should -Invoke -CommandName Write-Error -Times 1
-# }
-
-#         # - Write-Error - mock this internal function to check that errors are being raised
-#         Mock -Command Write-Error -MockWith { return $MessageData } -Verifiable

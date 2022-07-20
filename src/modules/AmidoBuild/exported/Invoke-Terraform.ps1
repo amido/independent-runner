@@ -27,7 +27,7 @@ function Invoke-Terraform() {
         )]
         [switch]
         # Validate templates
-        $format,        
+        $format,
 
         [Parameter(
             ParameterSetName="init"
@@ -41,8 +41,8 @@ function Invoke-Terraform() {
         )]
         [switch]
         # Initalise Terraform
-        $plan,    
-        
+        $plan,
+
         [Parameter(
             ParameterSetName="output"
         )]
@@ -63,13 +63,13 @@ function Invoke-Terraform() {
         [switch]
         # Perform validate check on templates
         $validate,
-        
+
         [Parameter(
             ParameterSetName="workspace"
         )]
         [switch]
         # Initalise Terraform
-        $workspace,        
+        $workspace,
 
         [string[]]
         [Alias("backend", "properties")]
@@ -92,7 +92,6 @@ function Invoke-Terraform() {
 
     # Check parameters exist for certain cmds
     if (@("init").Contains($PSCmdlet.ParameterSetName)) {
-
         # Check that some backend properties have been set
         # If they have not then raise an error
         # If they have then check to see if one argument has been raised and if it has split on the comma in case
@@ -170,7 +169,7 @@ function Invoke-Terraform() {
             $command = "{0} fmt -diff -check -recursive" -f $terraform
 
             Invoke-External -Command $command
-        }        
+        }
 
         # Plan the infrastrtcure
         "plan" {
@@ -181,7 +180,7 @@ function Invoke-Terraform() {
         }
 
         # Output information from the state
-        # This will retrieve all the non-sensitive values, if these are required then 
+        # This will retrieve all the non-sensitive values, if these are required then
         # the -Sensitive switch must been specified
         "output" {
 
@@ -196,7 +195,7 @@ function Invoke-Terraform() {
                 # iterate around the data and get the values for all the sensitive variables
                 if ($sensitive) {
                     $data | Get-Member -MemberType NoteProperty | ForEach-Object {
-                        
+
                         $name = $_.Name
 
                         # if if the output is a sensitive value get the value using Terraform
@@ -225,7 +224,7 @@ function Invoke-Terraform() {
             Invoke-External -Command $commands
 
             # After validation has run, delete the terraform dir and lock file
-            # This is so that it does not interfer with the deployment of the infrastructure
+            # This is so that it does not interfere with the deployment of the infrastructure
             # when a valid backend is initialised
             Write-Information -MessageData "Removing Terraform init files for 'false' backend"
             $removals = @(
@@ -248,13 +247,17 @@ function Invoke-Terraform() {
             } else {
                 Write-Information -MessageData ("Attempting to select workspace: {0}" -f $arguments[0])
                 $command = "{0} workspace select {1}" -f $terraform, $arguments[0]
-                Invoke-External -Command $command
 
-                # if the lastexitcode is 1 then create the workspace
-                if ($LASTEXITCODE -eq 1) {
-                    Write-Information -MessageData "Creating workspace as it does not exist"
-                    $command = "{0} workspace new {1}" -f $terraform, $arguments[0]
+                try {
                     Invoke-External -Command $command
+                }
+                catch [StopTaskException] {
+                    # if the lastexitcode is 1 then create the workspace
+                    if ($_.Exception.ExitCode -eq 1) {
+                        Write-Information -MessageData "Creating workspace as it does not exist"
+                        $command = "{0} workspace new {1}" -f $terraform, $arguments[0]
+                        Invoke-External -Command $command
+                    }
                 }
             }
         }

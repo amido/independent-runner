@@ -1,9 +1,7 @@
-
-
 function Confirm-Environment() {
 
     <#
-    
+
     .SYNOPSIS
     Checks that all the environment variables have been configured
 
@@ -21,7 +19,7 @@ function Confirm-Environment() {
         credentials:
             azure:  [{}]
             aws: [{}]
-    
+
     stages:
         name: <NAME>
         variables: [{}]
@@ -63,7 +61,7 @@ function Confirm-Environment() {
 
     If "json" is specifed the missing variables are returned in a JSON string
 
-    
+
     #>
 
     [CmdletBinding()]
@@ -95,25 +93,10 @@ function Confirm-Environment() {
         $format
     )
 
-    # Check that the specified path exists
-    if (!(Test-Path -Path $path)) {
-        Stop-Task -Message ("Specified file does not exist: {0}" -f $path)
-        return
-    }
-
-    # Check that the command ConvertFrom-Yaml exists
-    $exists = Get-Command -Name ConvertFrom-Yaml
-    if ([string]::IsNullOrEmpty($exists)) {
-        Stop-Task -Message "Please ensure that the Powershell-Yaml module is installed"
-    }
-
-    # Create an array to hold the missing environment variables
-    # $missing = @()
-
     # Get a list of the required variables for this stage and the chosen cloud platform
     $missing = Get-EnvConfig -path $path -stage $stage -cloud $cloud
 
-    # If there are missing values provide an error messahe and stop the task
+    # If there are missing values provide an error message and stop the task
     if ($missing.count -gt 0) {
 
         if ($passthru.IsPresent) {
@@ -128,7 +111,7 @@ function Confirm-Environment() {
                     $missing
                 }
             }
-            
+
         } else {
 
             # determine the length of the longest string
@@ -137,28 +120,28 @@ function Confirm-Environment() {
                 if ($item.name.length -gt $length) {
                     $length = $item.name.length
                 }
-            }            
+            }
 
             $message = @()
             foreach ($item in $missing) {
-            
+
                 # determine how many whitespaces are required for this name lenght to pad it out
                 $padding = $length - $item.name.length
-            
+
                 $sb = [System.Text.StringBuilder]::new()
                 [void]$sb.Append($item.name)
-            
+
                 if (![string]::IsNullOrEmpty($item.description)) {
                     $whitespace = " " * $padding
                     [void]$sb.Append($whitespace)
                     [void]$sb.Append(" - {0}" -f $item.description)
                 }
-            
+
                 $message += $sb.ToString()
             }
 
             # As there is an error the task in Taskctl needs to be stopped
-            Stop-Task -Message ("The following environment variables are missing and must be provided: `n`t{0}" -f ($message -join "`n`t"))
+            Stop-Task -Message ("The following environment variables are missing and must be provided:`n`t{0}" -f ($message -join "`n`t"))
         }
     }
 }

@@ -45,7 +45,7 @@ function Invoke-External {
             }
         }
 
-        # if a file has been set in the session, append the command to the file
+        # If a file has been set in the session, append the command to the file
         if (![String]::IsNullOrEmpty($Session.commands.file)) {
             Add-Content -Path $Session.commands.file -Value $command
         }
@@ -54,6 +54,9 @@ function Invoke-External {
 
             # Output the command being called
             Write-Information -MessageData $command
+
+            # Reset the LASTEXITCODE as it can be tripped from a variety of places...
+            $global:LASTEXITCODE = 0
 
             $output = Invoke-Expression -Command $command
 
@@ -64,12 +67,13 @@ function Invoke-External {
                 $global:Session.commands.exitcodes += $LASTEXITCODE
             }
 
-            # Strop the task if the LASTEXITCODE is greater than 0
+
+            # Stop the task if the LASTEXITCODE is greater than 0
             if ($LASTEXITCODE -gt 0) {
-                Stop-Task
+                Stop-Task -ExitCode $LASTEXITCODE
             }
 
-            
+
         }
     }
 }

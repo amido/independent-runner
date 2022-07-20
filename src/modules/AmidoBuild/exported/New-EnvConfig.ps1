@@ -1,8 +1,7 @@
-
 function New-EnvConfig() {
 
     <#
-    
+
     .SYNOPSIS
     Creates a shell script that can be used to configure the environment variables
     for running the pipeline on a local workstation
@@ -50,7 +49,7 @@ function New-EnvConfig() {
 
     [CmdletBinding()]
     param (
-        
+
         [string]
         # Path to the environment configuration file
         $path,
@@ -68,7 +67,7 @@ function New-EnvConfig() {
         # Stage being run which determines the variables to be chcked for
         # This stage will be merged with the default check
         # If not specified then only the deafult stage will be checked
-        $stage = $env:STAGE,        
+        $stage = $env:STAGE,
 
         [string]
         # Shell that the script should be generated for
@@ -83,13 +82,6 @@ function New-EnvConfig() {
     # Check that the specified path exists
     if (!(Test-Path -Path $path)) {
         Stop-Task -Message ("Specified file does not exist: {0}" -f $path)
-        return
-    }    
-
-    # Check that the command ConvertFrom-Yaml exists
-    $exists = Get-Command -Name ConvertFrom-Yaml
-    if ([string]::IsNullOrEmpty($exists)) {
-        Stop-Task -Message "Please ensure that the Powershell-Yaml module is installed"
     }
 
     # Get a list of the missing variables for this stage and the chosen cloud platform
@@ -102,8 +94,8 @@ function New-EnvConfig() {
         $preamble = "export "
         $extension = "sh"
     } else {
-        $extension = "ps1"
         $preamble = '$env:'
+        $extension = "ps1"
     }
 
     $data = @()
@@ -112,7 +104,7 @@ function New-EnvConfig() {
     $data += "`# The Cloud platform for which these variables are being set"
     $data += '{0}CLOUD_PLATFORM="{1}"' -f $preamble, $cloud.ToLower()
 
-    # Iterate around the missing variables 
+    # Iterate around the missing variables
     foreach ($item in $missing) {
 
         # Add the description to the array
@@ -125,6 +117,6 @@ function New-EnvConfig() {
     # Determine the name of the script file
     $filename = [IO.Path]::Combine($scriptPath, $("envvar-{0}-{1}.{2}" -f $cloud.ToLower(), $stage.ToLower(), $extension))
 
-     # Set the contents of the file with the information in the $data var
-     Set-Content -Path $filename -Value ($data -join "`n")
+    # Set the contents of the file with the information in the $data var
+    Set-Content -Path $filename -Value ($data -join "`n")
 }
